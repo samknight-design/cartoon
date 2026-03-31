@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brochure Builder</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f5;color:#1a1a2e;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+    /* ── Header ── */
+    header{background:#1a1a2e;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.4);flex-shrink:0}
+    .logo{font-size:1.1rem;font-weight:700;color:#c9a84c;white-space:nowrap;letter-spacing:.5px}
+    #project-name{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:7px 12px;border-radius:6px;font-size:.9rem;min-width:0}
+    #project-name::placeholder{color:rgba(255,255,255,.35)}
+    #project-name:focus{outline:none;border-color:#c9a84c}
+    .hdr-actions{display:flex;gap:8px;flex-shrink:0}
+    .btn{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .15s;white-space:nowrap}
+    .btn-save{background:#c9a84c;color:#1a1a2e}.btn-save:hover{background:#dbb95e}
+    .btn-review{background:#2563eb;color:#fff}.btn-review:hover{background:#1d4ed8}
+    .btn-export{background:#16a34a;color:#fff}.btn-export:hover{background:#15803d}
+
+    /* ── Layout ── */
+    .app-body{display:flex;flex:1;overflow:hidden}
+
+    /* ── Sidebar ── */
+    .sidebar{width:210px;background:#1e2235;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+    .sidebar-hdr{padding:12px 14px;color:#c9a84c;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center}
+    .page-count{color:rgba(255,255,255,.35);font-size:.7rem;font-weight:400;text-transform:none;letter-spacing:0}
+    .pages-list{flex:1;overflow-y:auto;padding:8px}
+    .page-item{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:9px 10px;margin-bottom:5px;cursor:pointer;transition:all .15s;color:rgba(255,255,255,.65);position:relative;user-select:none}
+    .page-item:hover{background:rgba(255,255,255,.09)}
+    .page-item.active{background:rgba(201,168,76,.18);border-color:rgba(201,168,76,.6);color:#fff}
+    .page-item.double-spread{border-left:3px solid #8b5cf6}
+    .pg-num{font-size:.65rem;color:rgba(255,255,255,.35);margin-bottom:1px}
+    .pg-type{font-size:.78rem;font-weight:600}
+    .pg-tpl{font-size:.68rem;color:rgba(255,255,255,.4);margin-top:1px}
+    .pg-del{position:absolute;top:6px;right:6px;background:none;border:none;color:rgba(255,80,80,.4);cursor:pointer;font-size:.75rem;padding:2px 4px;border-radius:3px;opacity:0;transition:opacity .15s;line-height:1}
+    .page-item:hover .pg-del{opacity:1}
+    .pg-del:hover{color:#ff4444;background:rgba(255,0,0,.1)}
+    .add-btn{margin:6px 8px 10px;padding:9px;background:rgba(201,168,76,.1);border:1px dashed rgba(201,168,76,.35);color:#c9a84c;border-radius:6px;cursor:pointer;font-size:.82rem;font-weight:600;text-align:center;transition:all .15s}
+    .add-btn:hover{background:rgba(201,168,76,.2);border-color:#c9a84c}
+
+    /* ── Editor ── */
+    .editor{flex:1;overflow-y:auto;padding:20px 24px}
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:rgba(26,26,46,.35);text-align:center;gap:10px}
+    .empty-icon{font-size:2.8rem}
+    .empty-state h3{font-size:1.1rem}
+    .empty-state p{font-size:.85rem}
+
+    /* ── Page card ── */
+    .page-card{background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;max-width:920px}
+    .card-hdr{background:#1a1a2e;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px}
+    .card-hdr h2{font-size:1rem;flex:1}
+    .pg-badge{background:rgba(201,168,76,.2);color:#c9a84c;border:1px solid rgba(201,168,76,.4);border-radius:20px;padding:3px 11px;font-size:.75rem;font-weight:700;white-space:nowrap}
+
+    .card-sec{padding:18px 20px;border-bottom:1px solid #f0f2f5}
+    .card-sec:last-child{border-bottom:none}
+    .sec-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:10px}
+
+    /* ── Option buttons ── */
+    .opts{display:flex;flex-wrap:wrap;gap:7px}
+    .opt{padding:7px 14px;border:2px solid #e5e7eb;background:#fff;border-radius:7px;cursor:pointer;font-size:.82rem;font-weight:600;color:#374151;transition:all .15s}
+    .opt:hover{border-color:#9ca3af}
+    .opt.sel{border-color:#c9a84c;background:rgba(201,168,76,.1);color:#1a1a2e}
+    .opt.tpl-retail.sel{border-color:#2563eb;background:#eff6ff;color:#1d4ed8}
+    .opt.tpl-river.sel{border-color:#16a34a;background:#f0fdf4;color:#15803d}
+    .opt.tpl-luxury.sel{border-color:#c9a84c;background:rgba(201,168,76,.1);color:#92400e}
+    .opt.tpl-tm.sel{border-color:#7c3aed;background:#f5f3ff;color:#6d28d9}
+
+    /* ── Fields ── */
+    .fgrid{display:grid;gap:14px}
+    .fgrid.two{grid-template-columns:1fr 1fr}
+    .fgrid.three{grid-template-columns:1fr 1fr 1fr}
+    .fg{display:flex;flex-direction:column;gap:5px}
+    .fg.span{grid-column:1/-1}
+    .fg label{font-size:.75rem;font-weight:600;color:#374151}
+    .fg input,.fg textarea,.fg select{padding:8px 11px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:.85rem;color:#1a1a2e;font-family:inherit;transition:border-color .15s;background:#fafafa}
+    .fg input:focus,.fg textarea:focus,.fg select:focus{outline:none;border-color:#c9a84c;background:#fff}
+    .fg textarea{resize:vertical;min-height:75px}
+
+    /* ── Deal boxes ── */
+    .deal-box{background:#f5f8ff;border:1px solid #dbeafe;border-radius:8px;padding:14px;margin-bottom:12px}
+    .deal-box:last-child{margin-bottom:0}
+    .deal-box.deal2{background:#f0fdf4;border-color:#bbf7d0}
+    .deal-box.spread-deal{background:#fdf8f0;border-color:#fde68a}
+    .deal-lbl{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2563eb;margin-bottom:10px}
+    .deal-box.deal2 .deal-lbl{color:#16a34a}
+    .deal-box.spread-deal .deal-lbl{color:#d97706}
+
+    /* ── Modal ── */
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center}
+    .overlay.open{display:flex}
+    .modal{background:#fff;border-radius:12px;padding:22px;max-width:460px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+    .modal h3{margin-bottom:12px;font-size:1.05rem;color:#1a1a2e}
+    .modal p{color:#6b7280;font-size:.83rem;margin-bottom:10px}
+    .modal textarea{width:100%;padding:9px;border:1.5px solid #e5e7eb;border-radius:7px;font-family:inherit;font-size:.85rem;resize:vertical;min-height:90px;margin-bottom:12px}
+    .modal textarea:focus{outline:none;border-color:#2563eb}
+    .modal-summary{font-size:.78rem;color:#6b7280;background:#f9fafb;border-radius:6px;padding:8px 10px;margin-bottom:14px}
+    .modal-acts{display:flex;gap:8px;justify-content:flex-end}
+    .btn-cancel{background:#f3f4f6;color:#374151}.btn-cancel:hover{background:#e5e7eb}
+    .btn-send{background:#2563eb;color:#fff}.btn-send:hover{background:#1d4ed8}
+
+    /* ── Toast ── */
+    .toast{position:fixed;bottom:22px;right:22px;background:#1a1a2e;color:#fff;padding:11px 18px;border-radius:8px;font-size:.83rem;font-weight:600;transform:translateY(70px);opacity:0;transition:all .25s;z-index:2000;pointer-events:none}
+    .toast.ok{background:#16a34a}
+    .toast.show{transform:translateY(0);opacity:1}
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:3px}
+
+    @media(max-width:680px){
+      .sidebar{width:165px}
+      .fgrid.two{grid-template-columns:1fr}
+      .fgrid.three{grid-template-columns:1fr}
+      .hdr-actions .btn-review{display:none}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Brochure Builder</div>
+  <input type="text" id="project-name" placeholder="Enter project name…" value="New Brochure Project">
+  <div class="hdr-actions">
+    <button class="btn btn-save" onclick="saveProject()">Save</button>
+    <button class="btn btn-review" onclick="openReviewModal()">Send for Review</button>
+    <button class="btn btn-export" onclick="exportCSV()">Export CSV</button>
+  </div>
+</header>
+
+<div class="app-body">
+  <aside class="sidebar">
+    <div class="sidebar-hdr">Pages <span class="page-count" id="page-count">0 pages</span></div>
+    <div class="pages-list" id="pages-list"></div>
+    <button class="add-btn" onclick="addPage()">+ Add Page</button>
+  </aside>
+  <div class="editor" id="editor">
+    <div class="empty-state">
+      <div class="empty-icon">📄</div>
+      <h3>No pages yet</h3>
+      <p>Click "+ Add Page" to start building your brochure</p>
+    </div>
+  </div>
+</div>
+
+<!-- Review modal -->
+<div class="overlay" id="review-modal">
+  <div class="modal">
+    <h3>Send Project for Review</h3>
+    <p>Add any notes for the reviewer:</p>
+    <textarea id="review-notes" placeholder="Notes for reviewer…"></textarea>
+    <div class="modal-summary" id="review-summary"></div>
+    <div class="modal-acts">
+      <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-send" onclick="sendReview()">Send for Review</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Data ───────────────────────────────────────────────────────────────────
+
+let project = { name: 'New Brochure Project', pages: [], savedAt: null };
+let currentId = null;
+
+const TEMPLATES = ['Retail', 'River', 'Luxury', 'TM'];
+
+const PAGE_TYPES = [
+  { id: 'front_cover',    label: 'Front Cover',         pp: 1 },
+  { id: 'back_cover',     label: 'Back Cover',          pp: 1 },
+  { id: 'content',        label: 'Content Page',        pp: 1 },
+  { id: '1_deal',         label: '1 Deal Page',         pp: 1 },
+  { id: '2_deal',         label: '2 Deal Page',         pp: 1 },
+  { id: 'double_spread',  label: 'Double Page Spread',  pp: 2 },
+];
+
+const COVER_FIELDS = [
+  { id:'title',          label:'Brochure Title',       ph:'e.g. Mediterranean Dreams 2025' },
+  { id:'subtitle',       label:'Subtitle',             ph:'e.g. Exclusive Cruise Collection' },
+  { id:'season',         label:'Season / Year',        ph:'e.g. Summer 2025' },
+  { id:'edition',        label:'Edition',              ph:'e.g. Issue 1' },
+  { id:'tagline',        label:'Tagline',              ph:'e.g. Discover the World in Luxury' },
+  { id:'hero_image_ref', label:'Hero Image Reference', ph:'e.g. cover-med-2025.jpg' },
+];
+
+const BACK_FIELDS = [
+  { id:'tagline',          label:'Tagline',                  ph:'e.g. Book your dream cruise today' },
+  { id:'contact_phone',    label:'Contact Phone',            ph:'e.g. 0800 123 4567' },
+  { id:'contact_email',    label:'Contact Email',            ph:'e.g. bookings@example.com' },
+  { id:'website',          label:'Website',                  ph:'e.g. www.example.com' },
+  { id:'social_handle',    label:'Social Media Handle',      ph:'e.g. @ExampleCruises' },
+  { id:'back_image_ref',   label:'Background Image Ref',     ph:'e.g. back-cover-bg.jpg' },
+  { id:'legal_text',       label:'Legal / Terms Text',       ph:'Terms and conditions apply…', area:true, span:true },
+];
+
+const CONTENT_FIELDS = [
+  { id:'heading',       label:'Heading',      ph:'e.g. The Mediterranean Experience' },
+  { id:'subheading',    label:'Subheading',   ph:'e.g. Explore ancient ports and stunning coastlines' },
+  { id:'pull_quote',    label:'Pull Quote',   ph:'e.g. "A voyage unlike any other"' },
+  { id:'image_ref',     label:'Image Reference', ph:'e.g. destination-med.jpg' },
+  { id:'image_caption', label:'Image Caption', ph:'e.g. Santorini, Greece' },
+  { id:'body_text',     label:'Body Text',    ph:'Enter page body copy here…', area:true, span:true },
+];
+
+const DEAL_FIELDS = [
+  { id:'cruise_line',     label:'Cruise Line',          ph:'e.g. Royal Caribbean' },
+  { id:'ship_name',       label:'Ship Name',            ph:'e.g. Harmony of the Seas' },
+  { id:'region',          label:'Region',               sel:['Mediterranean','Caribbean','Northern Europe','Norwegian Fjords','Alaska','Asia','Australia & New Zealand','South America','Africa','Indian Ocean','Transatlantic','World Cruise','UK & Ireland','River – Danube','River – Rhine','River – Rhône','River – Seine','River – Douro','River – Nile','River – Mekong','River – Amazon','Other'] },
+  { id:'destination',     label:'Itinerary / Destination', ph:'e.g. Barcelona to Rome' },
+  { id:'duration_nights', label:'Duration (Nights)',    ph:'e.g. 7' },
+  { id:'departure_port',  label:'Departure Port',       ph:'e.g. Southampton' },
+  { id:'departure_dates', label:'Departure Dates',      ph:'e.g. 15 Jun – 22 Sep 2025' },
+  { id:'cabin_type',      label:'Cabin Type',           sel:["Inside","Outside","Balcony","Mini Suite","Suite","Deluxe Suite","Owner's Suite","Studio","Solo"] },
+  { id:'price_from',      label:'Price From (£)',       ph:'e.g. 899' },
+  { id:'inclusions',      label:'Inclusions',           ph:'e.g. Flights, Transfers, All Inclusive' },
+  { id:'offer_text',      label:'Offer / Deal Text',    ph:'e.g. FREE drinks package + £200 OBC' },
+  { id:'terms',           label:'Deal Terms',           ph:'e.g. Based on 2 adults sharing. Offer ends 31 Dec.' },
+  { id:'image_ref',       label:'Deal Image Reference', ph:'e.g. deal-harmony-med.jpg' },
+];
+
+const SPREAD_EXTRA = [
+  { id:'heading',        label:'Spread Heading',   ph:'e.g. Featured Voyage' },
+  { id:'subheading',     label:'Subheading',       ph:'e.g. An unforgettable journey' },
+  { id:'image_ref_left', label:'Left Image Ref',   ph:'e.g. spread-left.jpg' },
+  { id:'image_ref_right',label:'Right Image Ref',  ph:'e.g. spread-right.jpg' },
+  { id:'intro_text',     label:'Introduction Text', ph:'Introductory copy for the spread…', area:true, span:true },
+];
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2) }
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+function ptInfo(id){ return PAGE_TYPES.find(p=>p.id===id)||PAGE_TYPES[2] }
+
+function pageNumber(pid){
+  let n=1;
+  for(const p of project.pages){
+    if(p.id===pid) return n;
+    n+=ptInfo(p.pageType).pp;
+  }
+  return n;
+}
+
+function totalPP(){ return project.pages.reduce((s,p)=>s+ptInfo(p.pageType).pp,0) }
+
+// ─── Sidebar ────────────────────────────────────────────────────────────────
+
+function renderSidebar(){
+  const list=document.getElementById('pages-list');
+  const cnt=document.getElementById('page-count');
+  const tp=totalPP();
+  cnt.textContent=`${project.pages.length} pg${project.pages.length!==1?'s':''} (${tp} pp)`;
+  let n=1;
+  list.innerHTML=project.pages.map(p=>{
+    const pt=ptInfo(p.pageType);
+    const pn=n; n+=pt.pp;
+    const label=pt.pp>1?`pp ${pn}–${pn+pt.pp-1}`:`p${pn}`;
+    const dbl=p.pageType==='double_spread';
+    return `<div class="page-item${p.id===currentId?' active':''}${dbl?' double-spread':''}" onclick="selectPage('${p.id}')">
+      <div class="pg-num">${label}</div>
+      <div class="pg-type">${pt.label}</div>
+      <div class="pg-tpl">${p.template}</div>
+      <button class="pg-del" onclick="deletePage('${p.id}',event)">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ─── Editor ─────────────────────────────────────────────────────────────────
+
+function renderEditor(){
+  const ed=document.getElementById('editor');
+  if(!currentId){ ed.innerHTML=`<div class="empty-state"><div class="empty-icon">📄</div><h3>No pages yet</h3><p>Click "+ Add Page" to start building your brochure</p></div>`; return; }
+  const page=project.pages.find(p=>p.id===currentId);
+  if(!page){ return; }
+  const pt=ptInfo(page.pageType);
+  const pn=pageNumber(page.id);
+  const badge=pt.pp>1?`Pages ${pn} & ${pn+1}`:`Page ${pn}`;
+
+  ed.innerHTML=`
+    <div class="page-card">
+      <div class="card-hdr">
+        <h2>${pt.label}</h2>
+        <span class="pg-badge">${badge}</span>
+      </div>
+      <div class="card-sec">
+        <div class="sec-title">Template</div>
+        <div class="opts">
+          ${TEMPLATES.map(t=>`<button class="opt tpl-${t.toLowerCase()}${page.template===t?' sel':''}" onclick="setTemplate('${t}')">${t}</button>`).join('')}
+        </div>
+      </div>
+      <div class="card-sec">
+        <div class="sec-title">Page Type</div>
+        <div class="opts">
+          ${PAGE_TYPES.map(t=>`<button class="opt${page.pageType===t.id?' sel':''}" onclick="setPageType('${t.id}')">${t.label}${t.pp>1?' ✦':''}</button>`).join('')}
+        </div>
+      </div>
+      <div class="card-sec">
+        ${buildFields(page)}
+      </div>
+    </div>`;
+}
+
+function buildFields(page){
+  const f=page.fields||{};
+  if(page.pageType==='front_cover') return section('Page Content', fieldGrid(COVER_FIELDS, f, ''));
+  if(page.pageType==='back_cover')  return section('Page Content', fieldGrid(BACK_FIELDS, f, ''));
+  if(page.pageType==='content')     return section('Page Content', fieldGrid(CONTENT_FIELDS, f, ''));
+  if(page.pageType==='1_deal')      return section('Cruise Deal Details', dealBox(DEAL_FIELDS, f, '', 'Deal', ''));
+  if(page.pageType==='2_deal')      return section('Cruise Deal Details', dealBox(DEAL_FIELDS,f,'deal1_','Deal 1','')+dealBox(DEAL_FIELDS,f,'deal2_','Deal 2','deal2'));
+  if(page.pageType==='double_spread') return section('Double Page Spread Content',
+    fieldGrid(SPREAD_EXTRA, f, '')+'<div style="margin-top:16px">'+dealBox(DEAL_FIELDS,f,'deal_','Featured Deal (Optional)','spread-deal')+'</div>');
+  return '';
+}
+
+function section(title, inner){ return `<div class="sec-title">${title}</div>${inner}`; }
+
+function dealBox(fields, values, prefix, label, cls){
+  return `<div class="deal-box${cls?' '+cls:''}"><div class="deal-lbl">${label}</div>${fieldGrid(fields, values, prefix)}</div>`;
+}
+
+function fieldGrid(fields, values, prefix){
+  const cells=fields.map(f=>{
+    const fid=prefix+f.id;
+    const val=values[fid]||'';
+    const span=f.span?' span':'';
+    if(f.sel){
+      const opts=f.sel.map(o=>`<option value="${esc(o)}"${val===o?' selected':''}>${esc(o)}</option>`).join('');
+      return `<div class="fg${span}"><label>${f.label}</label><select data-fid="${esc(fid)}" onchange="setField(this)"><option value="">— Select —</option>${opts}</select></div>`;
+    } else if(f.area){
+      return `<div class="fg${span}"><label>${f.label}</label><textarea data-fid="${esc(fid)}" oninput="setField(this)" placeholder="${esc(f.ph||'')}">${esc(val)}</textarea></div>`;
+    } else {
+      return `<div class="fg${span}"><label>${f.label}</label><input type="text" data-fid="${esc(fid)}" oninput="setField(this)" placeholder="${esc(f.ph||'')}" value="${esc(val)}"></div>`;
+    }
+  });
+  return `<div class="fgrid two">${cells.join('')}</div>`;
+}
+
+// ─── Actions ────────────────────────────────────────────────────────────────
+
+function setField(el){
+  const page=project.pages.find(p=>p.id===currentId);
+  if(page) page.fields[el.dataset.fid]=el.value;
+}
+
+function setTemplate(t){
+  const page=project.pages.find(p=>p.id===currentId);
+  if(page){ page.template=t; renderEditor(); }
+}
+
+function setPageType(t){
+  const page=project.pages.find(p=>p.id===currentId);
+  if(page){ page.pageType=t; renderEditor(); renderSidebar(); }
+}
+
+function addPage(){
+  const page={id:uid(),template:'Retail',pageType:'content',fields:{}};
+  project.pages.push(page);
+  selectPage(page.id);
+}
+
+function deletePage(id,ev){
+  ev.stopPropagation();
+  if(project.pages.length===1){ toast('Cannot delete the only page'); return; }
+  project.pages=project.pages.filter(p=>p.id!==id);
+  if(currentId===id) currentId=project.pages[0]?.id||null;
+  renderSidebar();
+  renderEditor();
+}
+
+function selectPage(id){ currentId=id; renderSidebar(); renderEditor(); }
+
+// ─── Save / Load ─────────────────────────────────────────────────────────────
+
+function saveProject(){
+  project.name=document.getElementById('project-name').value||'Untitled Project';
+  project.savedAt=new Date().toISOString();
+  try{ localStorage.setItem('brochure_builder_v1',JSON.stringify(project)); toast('Project saved','ok'); }
+  catch(e){ toast('Save failed – storage full?'); }
+}
+
+function loadProject(){
+  try{
+    const raw=localStorage.getItem('brochure_builder_v1');
+    if(!raw) return;
+    const saved=JSON.parse(raw);
+    project=saved;
+    document.getElementById('project-name').value=project.name||'';
+    currentId=project.pages?.[0]?.id||null;
+    renderSidebar(); renderEditor();
+    toast('Project loaded','ok');
+  }catch(e){}
+}
+
+// ─── Review ──────────────────────────────────────────────────────────────────
+
+function openReviewModal(){
+  const tp=totalPP();
+  document.getElementById('review-summary').textContent=
+    `Project: ${project.name||'Untitled'} · ${project.pages.length} entries · ${tp} printed pages`;
+  document.getElementById('review-notes').value='';
+  document.getElementById('review-modal').classList.add('open');
+}
+
+function closeModal(){ document.getElementById('review-modal').classList.remove('open'); }
+
+function sendReview(){
+  project.name=document.getElementById('project-name').value||'Untitled Project';
+  const notes=document.getElementById('review-notes').value;
+  const tp=totalPP();
+  const list=project.pages.map((p,i)=>{
+    const pt=ptInfo(p.pageType);
+    return `  ${i+1}. ${pt.label} (${p.template})`;
+  }).join('\n');
+  const subj=encodeURIComponent(`Brochure Review: ${project.name}`);
+  const body=encodeURIComponent(
+    `Hi,\n\nPlease review the following brochure project:\n\nProject: ${project.name}\nPages: ${project.pages.length} entries / ${tp} printed pages\n\nPage List:\n${list}\n\nNotes:\n${notes||'(none)'}\n\nThank you`
+  );
+  window.location.href=`mailto:?subject=${subj}&body=${body}`;
+  closeModal();
+  toast('Opening email client…','ok');
+}
+
+// ─── Export CSV ───────────────────────────────────────────────────────────────
+
+function exportCSV(){
+  project.name=document.getElementById('project-name').value||'Untitled Project';
+  if(!project.pages.length){ toast('No pages to export'); return; }
+
+  // Collect every possible column across all pages
+  const baseCol=['page_number','printed_pages','template','page_type'];
+  const allFieldKeys=new Set();
+  project.pages.forEach(p=>Object.keys(p.fields||{}).forEach(k=>allFieldKeys.add(k)));
+
+  // Canonical column order (prefix groups)
+  const prefixes=['','deal_','deal1_','deal2_'];
+  const allSingleFields=[...COVER_FIELDS,...BACK_FIELDS,...CONTENT_FIELDS,...SPREAD_EXTRA].map(f=>f.id);
+  const orderedFieldCols=[];
+  const seen=new Set();
+  // Add single-page fields first (no prefix)
+  allSingleFields.forEach(id=>{ if(!seen.has(id)){ seen.add(id); orderedFieldCols.push(id); } });
+  // Add deal fields for each prefix
+  ['deal_','deal1_','deal2_'].forEach(pfx=>{
+    DEAL_FIELDS.forEach(f=>{ const k=pfx+f.id; if(!seen.has(k)){ seen.add(k); orderedFieldCols.push(k); } });
+  });
+  // Any remaining unexpected fields
+  allFieldKeys.forEach(k=>{ if(!seen.has(k)){ orderedFieldCols.push(k); } });
+
+  const columns=[...baseCol,...orderedFieldCols];
+
+  let n=1;
+  const rows=project.pages.map(page=>{
+    const pt=ptInfo(page.pageType);
+    const row={};
+    row.page_number=n; n+=pt.pp;
+    row.printed_pages=pt.pp;
+    row.template=page.template;
+    row.page_type=pt.label;
+    Object.entries(page.fields||{}).forEach(([k,v])=>row[k]=v);
+    return row;
+  });
+
+  const csvLine=(vals)=>vals.map(v=>{
+    const s=String(v==null?'':v);
+    return (s.includes(',')||s.includes('"')||s.includes('\n'))?`"${s.replace(/"/g,'""')}"`:s;
+  }).join(',');
+
+  const csv=[columns.join(','),...rows.map(r=>csvLine(columns.map(c=>r[c]??'')))].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`${project.name.replace(/[^a-z0-9]/gi,'-').toLowerCase()}-brochure.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),500);
+  toast('CSV exported!','ok');
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+let toastTimer;
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`toast${type?' '+type:''}`;
+  void el.offsetWidth;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2600);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+document.getElementById('project-name').addEventListener('input',function(){ project.name=this.value; });
+document.getElementById('review-modal').addEventListener('click',function(e){ if(e.target===this) closeModal(); });
+
+loadProject();
+if(!project.pages.length){ renderSidebar(); renderEditor(); }
+</script>
+</body>
+</html>
