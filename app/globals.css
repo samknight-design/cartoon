@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #0a0a12;
+    --bg-secondary: #10101e;
+    --bg-card: #16162b;
+    --gold: #f59e0b;
+    --flame: #ea580c;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-arcane-900 text-slate-100 font-body antialiased;
+  }
+
+  h1, h2, h3, h4, h5 {
+    @apply font-display;
+  }
+
+  ::selection {
+    @apply bg-amber-500/30 text-amber-200;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-arcane-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-amber-600/50 rounded-full;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-flame-600
+           text-white font-semibold rounded-lg shadow-lg shadow-amber-900/30
+           hover:from-amber-400 hover:to-flame-500 transition-all duration-200
+           hover:shadow-amber-700/40 hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-6 py-3 border border-amber-500/50
+           text-amber-400 font-semibold rounded-lg
+           hover:bg-amber-500/10 hover:border-amber-400 transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-arcane-700 border border-white/5 rounded-xl shadow-xl;
+  }
+
+  .section-title {
+    @apply text-3xl md:text-4xl font-display font-bold text-white mb-3;
+  }
+
+  .section-subtitle {
+    @apply text-slate-400 text-lg max-w-2xl;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-amber-400 via-amber-300 to-flame-400 bg-clip-text text-transparent;
+  }
+
+  .glow-amber {
+    text-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+  }
+
+  .divider {
+    @apply w-16 h-1 bg-gradient-to-r from-amber-500 to-flame-600 rounded-full my-4;
+  }
+
+  .input-field {
+    @apply w-full bg-arcane-800 border border-white/10 rounded-lg px-4 py-3
+           text-slate-100 placeholder-slate-500
+           focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30
+           transition-colors;
+  }
+}
+
+@layer utilities {
+  .text-shadow-glow {
+    text-shadow: 0 0 30px rgba(245, 158, 11, 0.4);
+  }
+
+  .bg-arcane-800 {
+    background-color: #10101e;
+  }
+}
