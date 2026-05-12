@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Reward Quest</string>
+    <string name="title_activity_main">Reward Quest</string>
+    <string name="package_name">com.rewardquest.app</string>
+    <string name="custom_url_scheme">com.rewardquest.app</string>
+</resources>
