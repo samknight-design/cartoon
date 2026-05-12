@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background-color: #0A0818;
+    color: white;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    height: 100%;
+    height: 100dvh;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl;
+  }
+
+  .glass-card-hover {
+    @apply glass-card active:scale-95 transition-all duration-150;
+  }
+
+  .coin-glow {
+    filter: drop-shadow(0 0 8px #FFD70080);
+  }
+
+  .gem-glow {
+    filter: drop-shadow(0 0 8px #9333EA80);
+  }
+
+  .btn-primary {
+    @apply font-display text-lg px-6 py-3 rounded-2xl font-bold
+           active:scale-95 transition-all duration-150 select-none;
+  }
+
+  .screen-container {
+    @apply flex flex-col h-full overflow-hidden;
+  }
+
+  .scrollable-content {
+    @apply flex-1 overflow-y-auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .scrollable-content::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Starfield background */
+.starfield {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: white;
+  animation: twinkle var(--duration, 3s) ease-in-out infinite var(--delay, 0s);
+}
+
+/* Confetti particle */
+@keyframes confettiDrop {
+  0% {
+    transform: translateY(-20px) rotate(0deg);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(var(--rot, 720deg));
+    opacity: 0;
+  }
+}
+
+.confetti-particle {
+  position: absolute;
+  top: -20px;
+  animation: confettiDrop var(--dur, 2s) var(--delay, 0s) ease-in forwards;
+  border-radius: 2px;
+}
+
+/* Number ticker */
+@keyframes tickUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.tick-up {
+  animation: tickUp 0.3s ease-out;
+}
+
+/* Shine effect for cards */
+@keyframes shine {
+  from { transform: translateX(-100%) skewX(-12deg); }
+  to { transform: translateX(200%) skewX(-12deg); }
+}
+
+.shine-effect::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  animation: shine 2s ease-in-out infinite;
+}
+
+/* Safe area padding for Samsung */
+.safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
+
+/* PIN dot */
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.4);
+  transition: all 0.2s;
+}
+.pin-dot.filled {
+  background: #FFD700;
+  border-color: #FFD700;
+  box-shadow: 0 0 10px #FFD70080;
+}
+
+/* Gradient text */
+.text-coin-gradient {
+  background: linear-gradient(135deg, #FFE566, #FFD700, #B8860B);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gem-gradient {
+  background: linear-gradient(135deg, #C084FC, #9333EA, #06B6D4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Touch ripple */
+@keyframes ripple {
+  from { transform: scale(0); opacity: 0.6; }
+  to { transform: scale(4); opacity: 0; }
+}
