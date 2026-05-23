@@ -10,24 +10,26 @@ const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
 const C = {
-  bg:     "#0a0f1e",
-  card:   "#131d35",
-  card2:  "#1a2744",
-  border: "#1e3060",
-  gold:   "#f59e0b",
-  text:   "#e2e8f0",
-  sub:    "#94a3b8",
-  muted:  "#64748b",
-  green:  "#10b981",
-  red:    "#ef4444",
+  bg:       "#0a0f1e",
+  card:     "#131d35",
+  card2:    "#1a2744",
+  border:   "#1e3060",
+  gold:     "#f59e0b",
+  crown:    "#fde68a",
+  text:     "#e2e8f0",
+  sub:      "#94a3b8",
+  muted:    "#64748b",
+  green:    "#10b981",
+  red:      "#ef4444",
+  purple:   "#a855f7",
 };
 
 const MANA = {
-  W: { bg: "#EDE8C8", fg: "#333", label: "White",  emoji: "☀️"  },
-  U: { bg: "#1469B5", fg: "#fff", label: "Blue",   emoji: "💧"  },
-  B: { bg: "#2a1f1a", fg: "#ccc", label: "Black",  emoji: "💀"  },
-  R: { bg: "#CC2200", fg: "#fff", label: "Red",    emoji: "🔥"  },
-  G: { bg: "#006B3C", fg: "#fff", label: "Green",  emoji: "🌿"  },
+  W: { bg: "#EDE8C8", fg: "#333", label: "White", emoji: "☀️" },
+  U: { bg: "#1469B5", fg: "#fff", label: "Blue",  emoji: "💧" },
+  B: { bg: "#2a1f1a", fg: "#ccc", label: "Black", emoji: "💀" },
+  R: { bg: "#CC2200", fg: "#fff", label: "Red",   emoji: "🔥" },
+  G: { bg: "#006B3C", fg: "#fff", label: "Green", emoji: "🌿" },
 };
 
 const TYPE_COLORS = {
@@ -46,14 +48,16 @@ const CURVE_COLORS = [
   "#a3e635","#fbbf24","#f97316","#ef4444"
 ];
 
-// Commander brackets (1-5)
 const BRACKETS = [
-  { n: 1, label: "Exhibition",  desc: "Precon-level, minimal synergy",    color: "#94a3b8" },
-  { n: 2, label: "Core",        desc: "Upgraded precon, casual fun",      color: "#22d3ee" },
-  { n: 3, label: "Upgraded",    desc: "Focused synergies, some staples",  color: "#34d399" },
-  { n: 4, label: "Optimised",   desc: "High-powered, near-cEDH",         color: "#f59e0b" },
-  { n: 5, label: "cEDH",        desc: "Fully optimised, competitive",     color: "#ef4444" },
+  { n: 1, label: "Exhibition",  desc: "Precon-level, minimal synergy",   color: "#94a3b8" },
+  { n: 2, label: "Core",        desc: "Upgraded precon, casual fun",     color: "#22d3ee" },
+  { n: 3, label: "Upgraded",    desc: "Focused synergies, some staples", color: "#34d399" },
+  { n: 4, label: "Optimised",   desc: "High-powered, near-cEDH",        color: "#f59e0b" },
+  { n: 5, label: "cEDH",        desc: "Fully optimised, competitive",    color: "#ef4444" },
 ];
+
+// Basic land names for singleton exemption
+const BASIC_LANDS = new Set(["Plains","Island","Swamp","Mountain","Forest","Wastes"]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -65,6 +69,9 @@ const getColors = (card) =>
     ? card.colors
     : card?.card_faces?.[0]?.colors ?? [];
 
+// Color identity for Commander (includes all colors in mana costs/rules text)
+const getColorIdentity = (card) => card?.color_identity ?? [];
+
 const getCardType = (typeLine) => {
   if (!typeLine) return "Other";
   if (typeLine.includes("Land"))         return "Land";
@@ -75,6 +82,16 @@ const getCardType = (typeLine) => {
   if (typeLine.includes("Enchantment"))  return "Enchantment";
   if (typeLine.includes("Artifact"))     return "Artifact";
   return "Other";
+};
+
+const isLegendaryCreature = (card) => {
+  const tl = card?.type_line ?? "";
+  return tl.includes("Legendary") && (tl.includes("Creature") || tl.includes("Planeswalker"));
+};
+
+const isBasicLand = (card) => {
+  const tl = card?.type_line ?? "";
+  return tl.includes("Basic") && tl.includes("Land");
 };
 
 const toBase64 = (file) =>
@@ -91,6 +108,14 @@ const apiHeaders = () => ({
   "anthropic-version": "2023-06-01",
   "anthropic-dangerous-direct-browser-access": "true",
 });
+
+// Base button styles for Android touch (no 300ms delay, no tap flash)
+const touchBase = {
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent",
+  userSelect: "none",
+  cursor: "pointer",
+};
 
 // ─── Shared UI primitives ────────────────────────────────────────────────────
 
@@ -128,15 +153,12 @@ const SectionTitle = ({ children }) => (
   </div>
 );
 
-const Tag = ({ children, color = C.muted, bg }) => (
+const Tag = ({ children, color = C.muted }) => (
   <span style={{
     fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
-    color: color,
-    background: bg ?? `${color}22`,
-    padding: "2px 6px",
-    borderRadius: 4,
-    textTransform: "uppercase",
-    flexShrink: 0,
+    color, background: `${color}22`,
+    padding: "2px 6px", borderRadius: 4,
+    textTransform: "uppercase", flexShrink: 0,
   }}>
     {children}
   </span>
@@ -148,9 +170,9 @@ const ColorPip = ({ color }) => {
   return (
     <span title={m.label} style={{
       display: "inline-flex", alignItems: "center", justifyContent: "center",
-      width: 16, height: 16, borderRadius: "50%",
+      width: 18, height: 18, borderRadius: "50%",
       background: m.bg, color: m.fg,
-      fontSize: 9, fontWeight: 700,
+      fontSize: 10, fontWeight: 700,
       border: "1px solid rgba(255,255,255,0.15)",
       flexShrink: 0,
     }}>
@@ -166,16 +188,15 @@ const GoldBtn = ({ children, onClick, disabled, style = {}, variant = "primary" 
       onClick={onClick}
       disabled={disabled}
       style={{
-        background: isPrimary
-          ? `linear-gradient(135deg, #f59e0b, #d97706)`
-          : "transparent",
+        ...touchBase,
+        background: isPrimary ? `linear-gradient(135deg, #f59e0b, #d97706)` : "transparent",
         color: isPrimary ? "#0a0f1e" : C.gold,
         border: isPrimary ? "none" : `1px solid ${C.gold}44`,
         borderRadius: 10,
-        padding: "10px 18px",
+        padding: "12px 18px",
         fontWeight: 700, fontSize: 14,
-        opacity: disabled ? 0.5 : 1,
-        transition: "opacity 0.15s, transform 0.1s",
+        minHeight: 44,
+        opacity: disabled ? 0.45 : 1,
         ...style,
       }}
     >
@@ -184,27 +205,151 @@ const GoldBtn = ({ children, onClick, disabled, style = {}, variant = "primary" 
   );
 };
 
+// Format toggle pill
+const FormatToggle = ({ format, onChange }) => (
+  <div style={{
+    display: "flex",
+    background: C.card2,
+    border: `1px solid ${C.border}`,
+    borderRadius: 20, padding: 3, gap: 2,
+  }}>
+    {[
+      { id: "standard",  label: "60-Card" },
+      { id: "commander", label: "Commander" },
+    ].map(f => (
+      <button
+        key={f.id}
+        onClick={() => onChange(f.id)}
+        style={{
+          ...touchBase,
+          padding: "5px 10px",
+          borderRadius: 16,
+          fontSize: 11, fontWeight: 700,
+          background: format === f.id
+            ? (f.id === "commander" ? `linear-gradient(135deg,#a855f7,#7c3aed)` : `linear-gradient(135deg,${C.gold},#d97706)`)
+            : "transparent",
+          color: format === f.id ? (f.id === "commander" ? "#fff" : "#0a0f1e") : C.muted,
+          border: "none",
+          minHeight: 30,
+        }}
+      >
+        {f.id === "commander" ? "👑 " : ""}{f.label}
+      </button>
+    ))}
+  </div>
+);
+
+// ─── Commander Hero Card ───────────────────────────────────────────────────────
+
+const CommanderHero = ({ commander, onClear, onPreview }) => {
+  if (!commander) return null;
+  const img = getImg(commander, "normal");
+  const identity = getColorIdentity(commander);
+
+  return (
+    <div style={{
+      background: `linear-gradient(135deg, #1a0a3a, #2d0a5a)`,
+      border: `2px solid #a855f744`,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 12,
+      animation: "fadeIn 0.3s ease",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* Glow */}
+      <div style={{
+        position: "absolute", top: -30, right: -30,
+        width: 120, height: 120, borderRadius: "50%",
+        background: "rgba(168,85,247,0.15)",
+        pointerEvents: "none",
+      }} />
+
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: "#a855f7", textTransform: "uppercase", marginBottom: 10 }}>
+        👑 Commander
+      </div>
+
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+        {img && (
+          <div
+            onClick={() => onPreview(commander)}
+            style={{
+              ...touchBase,
+              width: 70, borderRadius: 8, overflow: "hidden",
+              boxShadow: "0 4px 20px rgba(168,85,247,0.4)",
+              border: "2px solid #a855f7",
+              flexShrink: 0,
+            }}
+          >
+            <img src={img} alt={commander.name} style={{ width: "100%", display: "block" }} />
+          </div>
+        )}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.crown, marginBottom: 4, lineHeight: 1.2 }}>
+            {commander.name}
+          </div>
+          <div style={{ fontSize: 11, color: C.sub, marginBottom: 8, lineHeight: 1.4 }}>
+            {commander.type_line}
+          </div>
+          {identity.length > 0 && (
+            <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 10, color: C.muted, marginRight: 2 }}>Identity:</span>
+              {identity.map(c => <ColorPip key={c} color={c} />)}
+            </div>
+          )}
+          <button
+            onClick={onClear}
+            style={{
+              ...touchBase,
+              fontSize: 11, color: C.muted,
+              background: "rgba(255,255,255,0.05)",
+              border: `1px solid ${C.border}`,
+              borderRadius: 6, padding: "4px 10px",
+              minHeight: 30,
+            }}
+          >
+            Remove commander
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Card Row ─────────────────────────────────────────────────────────────────
 
-const CardRow = ({ entry, onDelta, onPreview }) => {
+const CardRow = ({
+  entry, onDelta, onPreview,
+  format, commander, onSetCommander,
+  singletonViolation,
+}) => {
   const { card, count } = entry;
   const type = getCardType(card.type_line);
   const colors = getColors(card);
   const img = getImg(card);
+  const isCmd = commander?.id === card.id;
+  const canBeCommander = format === "commander" && isLegendaryCreature(card) && !isCmd;
 
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 10,
-      padding: "8px 0",
+      padding: "9px 0",
       borderBottom: `1px solid ${C.border}22`,
+      background: isCmd ? "rgba(168,85,247,0.06)" : "transparent",
     }}>
+      {/* Commander crown indicator */}
+      {isCmd && (
+        <div style={{ fontSize: 14, flexShrink: 0 }}>👑</div>
+      )}
+
       {/* Thumbnail */}
       <div
         onClick={() => onPreview(card)}
         style={{
-          width: 36, height: 50, borderRadius: 4, overflow: "hidden",
-          background: C.card2, cursor: "pointer", flexShrink: 0,
-          border: `1px solid ${C.border}`,
+          ...touchBase,
+          width: 38, height: 52, borderRadius: 4, overflow: "hidden",
+          background: C.card2, flexShrink: 0,
+          border: isCmd ? `2px solid #a855f7` : `1px solid ${C.border}`,
         }}
       >
         {img && <img src={img} alt={card.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
@@ -212,7 +357,12 @@ const CardRow = ({ entry, onDelta, onPreview }) => {
 
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{
+          fontSize: 13, fontWeight: 600,
+          color: isCmd ? C.crown : C.text,
+          marginBottom: 3,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
           {card.name}
         </div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
@@ -222,29 +372,52 @@ const CardRow = ({ entry, onDelta, onPreview }) => {
           )}
           {colors.map(c => <ColorPip key={c} color={c} />)}
         </div>
+        {singletonViolation && (
+          <div style={{ fontSize: 10, color: C.red, marginTop: 2 }}>⚠️ Singleton rule</div>
+        )}
+        {/* Make commander button */}
+        {canBeCommander && (
+          <button
+            onClick={() => onSetCommander(card)}
+            style={{
+              ...touchBase,
+              marginTop: 4,
+              fontSize: 10, fontWeight: 700,
+              color: "#a855f7",
+              background: "rgba(168,85,247,0.12)",
+              border: "1px solid rgba(168,85,247,0.3)",
+              borderRadius: 5, padding: "3px 8px",
+              minHeight: 24,
+            }}
+          >
+            👑 Make Commander
+          </button>
+        )}
       </div>
 
       {/* Count controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
         <button
           onClick={() => onDelta(card.id, -1)}
           style={{
-            width: 26, height: 26, borderRadius: 6,
+            ...touchBase,
+            width: 34, height: 34, borderRadius: 8,
             background: C.card2, color: C.text,
-            fontSize: 16, fontWeight: 700,
+            fontSize: 18, fontWeight: 700,
             display: "flex", alignItems: "center", justifyContent: "center",
             border: `1px solid ${C.border}`,
           }}
         >−</button>
-        <span style={{ fontSize: 14, fontWeight: 700, color: C.gold, minWidth: 20, textAlign: "center" }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: C.gold, minWidth: 22, textAlign: "center" }}>
           {count}
         </span>
         <button
           onClick={() => onDelta(card.id, +1)}
           style={{
-            width: 26, height: 26, borderRadius: 6,
+            ...touchBase,
+            width: 34, height: 34, borderRadius: 8,
             background: C.card2, color: C.text,
-            fontSize: 16, fontWeight: 700,
+            fontSize: 18, fontWeight: 700,
             display: "flex", alignItems: "center", justifyContent: "center",
             border: `1px solid ${C.border}`,
           }}
@@ -256,18 +429,23 @@ const CardRow = ({ entry, onDelta, onPreview }) => {
 
 // ─── Scan Tab ─────────────────────────────────────────────────────────────────
 
-const ScanTab = ({ onAdd }) => {
-  const [scanState, setScanState] = useState("idle"); // idle | scanning | found | error
-  const [preview, setPreview] = useState(null);
-  const [result, setResult] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+const ScanTab = ({ onAdd, onSetCommander, format }) => {
+  const [scanState, setScanState] = useState("idle");
+  const [preview, setPreview]     = useState(null);
+  const [result, setResult]       = useState(null);
+  const [errorMsg, setErrorMsg]   = useState("");
+  const [searchQuery, setSearchQuery]   = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [addedCard, setAddedCard] = useState(null);
+  const [addedMsg, setAddedMsg]   = useState("");
 
-  const cameraRef = useRef();
+  const cameraRef  = useRef();
   const galleryRef = useRef();
+
+  const flash = (msg) => {
+    setAddedMsg(msg);
+    setTimeout(() => setAddedMsg(""), 2500);
+  };
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -278,7 +456,6 @@ const ScanTab = ({ onAdd }) => {
 
     try {
       if (!API_KEY) throw new Error("No API key — add VITE_ANTHROPIC_API_KEY to .env");
-
       const b64 = await toBase64(file);
       const mediaType = file.type || "image/jpeg";
 
@@ -292,7 +469,7 @@ const ScanTab = ({ onAdd }) => {
             role: "user",
             content: [
               { type: "image", source: { type: "base64", media_type: mediaType, data: b64 } },
-              { type: "text", text: 'Identify this Magic: The Gathering card. Reply ONLY with valid JSON: {"name":"exact card name","set":"set name if visible"} or {"name":null} if not an MTG card. No other text.' }
+              { type: "text", text: 'Identify this Magic: The Gathering card. Reply ONLY with valid JSON: {"name":"exact card name"} or {"name":null} if not an MTG card. No other text.' }
             ]
           }]
         })
@@ -302,10 +479,8 @@ const ScanTab = ({ onAdd }) => {
       if (!res.ok) throw new Error(data.error?.message || "API error");
       const rawText = data.content?.[0]?.text?.trim() || "{}";
       const parsed = JSON.parse(rawText.replace(/```[a-z]*/gi, "").replace(/```/g, "").trim());
-
       if (!parsed.name) throw new Error("Card not recognised — try better lighting or a cleaner angle");
 
-      // Lookup on Scryfall
       const sf = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(parsed.name)}`);
       const card = await sf.json();
       if (card.object === "error") throw new Error(`Scryfall: ${card.details}`);
@@ -316,16 +491,6 @@ const ScanTab = ({ onAdd }) => {
       setErrorMsg(e.message);
       setScanState("error");
     }
-  };
-
-  const confirmAdd = () => {
-    if (!result) return;
-    onAdd(result);
-    setAddedCard(result);
-    setTimeout(() => setAddedCard(null), 2500);
-    setScanState("idle");
-    setResult(null);
-    setPreview(null);
   };
 
   const handleSearch = async (q) => {
@@ -340,114 +505,114 @@ const ScanTab = ({ onAdd }) => {
     setSearchLoading(false);
   };
 
+  const reset = () => { setScanState("idle"); setPreview(null); setResult(null); };
+
   return (
     <div style={{ padding: "16px 16px 0" }}>
-      {/* Camera / Gallery buttons */}
+      {/* Camera / Gallery */}
       <Panel>
         <SectionTitle>Scan a Card</SectionTitle>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <button
-            onClick={() => cameraRef.current?.click()}
-            style={{
-              background: `linear-gradient(135deg, ${C.card2}, #0f1a3a)`,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12, padding: "18px 12px",
-              color: C.text, fontWeight: 700, fontSize: 15,
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-            }}
-          >
-            <span style={{ fontSize: 32 }}>📷</span>
-            Take Photo
-          </button>
-          <button
-            onClick={() => galleryRef.current?.click()}
-            style={{
-              background: `linear-gradient(135deg, ${C.card2}, #0f1a3a)`,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12, padding: "18px 12px",
-              color: C.text, fontWeight: 700, fontSize: 15,
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-            }}
-          >
-            <span style={{ fontSize: 32 }}>🖼️</span>
-            From Gallery
-          </button>
+          {[
+            { label: "Take Photo",   emoji: "📷", ref: cameraRef,  capture: true  },
+            { label: "From Gallery", emoji: "🖼️", ref: galleryRef, capture: false },
+          ].map(({ label, emoji, ref, capture }) => (
+            <button
+              key={label}
+              onClick={() => ref.current?.click()}
+              style={{
+                ...touchBase,
+                background: `linear-gradient(135deg, ${C.card2}, #0f1a3a)`,
+                border: `1px solid ${C.border}`,
+                borderRadius: 12, padding: "20px 12px",
+                color: C.text, fontWeight: 700, fontSize: 15,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                minHeight: 90,
+              }}
+            >
+              <span style={{ fontSize: 34 }}>{emoji}</span>
+              {label}
+            </button>
+          ))}
         </div>
-
-        <input
-          ref={cameraRef} type="file" accept="image/*" capture="environment"
-          style={{ display: "none" }}
-          onChange={e => handleFile(e.target.files[0])}
-        />
-        <input
-          ref={galleryRef} type="file" accept="image/*"
-          style={{ display: "none" }}
-          onChange={e => handleFile(e.target.files[0])}
-        />
+        <input ref={cameraRef}  type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
+        <input ref={galleryRef} type="file" accept="image/*"                       style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
       </Panel>
 
-      {/* Preview + result */}
+      {/* Scan result */}
       {preview && (
         <Panel>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-            <img
-              src={preview}
-              style={{ width: 90, borderRadius: 8, border: `1px solid ${C.border}` }}
-              alt="Scanned"
-            />
+            <img src={preview} style={{ width: 88, borderRadius: 8, border: `1px solid ${C.border}`, flexShrink: 0 }} alt="Scanned" />
             <div style={{ flex: 1 }}>
               {scanState === "scanning" && (
-                <div style={{ display: "flex", gap: 10, alignItems: "center", color: C.sub }}>
-                  <Spinner /> Identifying card…
+                <div style={{ display: "flex", gap: 10, alignItems: "center", color: C.sub, fontSize: 13 }}>
+                  <Spinner /> Identifying…
                 </div>
               )}
               {scanState === "error" && (
-                <div>
-                  <div style={{ color: C.red, fontWeight: 600, marginBottom: 8 }}>❌ {errorMsg}</div>
-                  <GoldBtn onClick={() => { setScanState("idle"); setPreview(null); }} variant="secondary" style={{ fontSize: 12 }}>
-                    Try again
-                  </GoldBtn>
-                </div>
+                <>
+                  <div style={{ color: C.red, fontWeight: 600, marginBottom: 10, fontSize: 13 }}>❌ {errorMsg}</div>
+                  <GoldBtn onClick={reset} variant="secondary" style={{ fontSize: 12, padding: "8px 14px" }}>Try again</GoldBtn>
+                </>
               )}
               {scanState === "found" && result && (
-                <div>
-                  <div style={{ fontSize: 12, color: C.sub, marginBottom: 4 }}>Identified:</div>
-                  <div style={{ fontWeight: 700, color: C.text, marginBottom: 4 }}>{result.name}</div>
-                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>{result.type_line}</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <GoldBtn onClick={confirmAdd} style={{ fontSize: 13, padding: "8px 14px" }}>
+                <>
+                  <div style={{ fontSize: 11, color: C.sub, marginBottom: 3 }}>Identified:</div>
+                  <div style={{ fontWeight: 700, color: C.text, marginBottom: 2, fontSize: 14 }}>{result.name}</div>
+                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 10, lineHeight: 1.4 }}>{result.type_line}</div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    <GoldBtn
+                      onClick={() => { onAdd(result); flash(`✓ Added: ${result.name}`); reset(); }}
+                      style={{ fontSize: 13, padding: "9px 14px" }}
+                    >
                       ✓ Add to Deck
                     </GoldBtn>
-                    <GoldBtn
-                      onClick={() => { setScanState("idle"); setPreview(null); setResult(null); }}
-                      variant="secondary"
-                      style={{ fontSize: 13, padding: "8px 14px" }}
-                    >
+
+                    {/* Commander shortcut — shown if Legendary Creature and in commander mode */}
+                    {format === "commander" && isLegendaryCreature(result) && (
+                      <button
+                        onClick={() => {
+                          onSetCommander(result);
+                          onAdd(result);
+                          flash(`👑 Commander set: ${result.name}`);
+                          reset();
+                        }}
+                        style={{
+                          ...touchBase,
+                          background: `linear-gradient(135deg,#a855f7,#7c3aed)`,
+                          color: "#fff", border: "none",
+                          borderRadius: 10, padding: "9px 14px",
+                          fontWeight: 700, fontSize: 13, minHeight: 44,
+                        }}
+                      >
+                        👑 Set as Commander
+                      </button>
+                    )}
+
+                    <GoldBtn onClick={reset} variant="secondary" style={{ fontSize: 13, padding: "9px 14px" }}>
                       Discard
                     </GoldBtn>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>
         </Panel>
       )}
 
-      {/* Added confirmation */}
-      {addedCard && (
+      {/* Flash message */}
+      {addedMsg && (
         <div style={{
-          background: `${C.green}22`, border: `1px solid ${C.green}44`,
+          background: addedMsg.startsWith("👑") ? "rgba(168,85,247,0.15)" : `${C.green}22`,
+          border: `1px solid ${addedMsg.startsWith("👑") ? "#a855f744" : `${C.green}44`}`,
           borderRadius: 10, padding: "10px 14px",
-          display: "flex", alignItems: "center", gap: 10,
+          fontSize: 13, fontWeight: 600,
+          color: addedMsg.startsWith("👑") ? "#d8b4fe" : C.green,
           marginBottom: 12, animation: "fadeIn 0.2s ease",
         }}>
-          {getImg(addedCard) && (
-            <img src={getImg(addedCard)} alt="" style={{ width: 36, borderRadius: 4 }} />
-          )}
-          <div>
-            <div style={{ fontSize: 12, color: C.green, fontWeight: 700 }}>✓ Added to deck</div>
-            <div style={{ fontSize: 13, color: C.text }}>{addedCard.name}</div>
-          </div>
+          {addedMsg}
         </div>
       )}
 
@@ -458,12 +623,12 @@ const ScanTab = ({ onAdd }) => {
           <input
             value={searchQuery}
             onChange={e => handleSearch(e.target.value)}
-            placeholder="Search card name…"
+            placeholder="Type a card name…"
             style={{
-              width: "100%", padding: "10px 14px",
+              width: "100%", padding: "12px 14px",
               background: C.card2, border: `1px solid ${C.border}`,
-              borderRadius: 8, color: C.text, fontSize: 14,
-              outline: "none",
+              borderRadius: 8, color: C.text, fontSize: 16,
+              outline: "none", minHeight: 44,
             }}
           />
           {searchLoading && (
@@ -475,35 +640,62 @@ const ScanTab = ({ onAdd }) => {
 
         {searchResults.length > 0 && (
           <div style={{ marginTop: 8 }}>
-            {searchResults.map(card => (
-              <div
-                key={card.id}
-                onClick={() => {
-                  onAdd(card);
-                  setAddedCard(card);
-                  setTimeout(() => setAddedCard(null), 2500);
-                  setSearchQuery("");
-                  setSearchResults([]);
-                }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "8px 10px", cursor: "pointer",
-                  borderRadius: 8, transition: "background 0.1s",
-                  borderBottom: `1px solid ${C.border}22`,
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = C.card2}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-              >
-                {getImg(card) && (
-                  <img src={getImg(card)} alt="" style={{ width: 30, borderRadius: 3 }} />
-                )}
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{card.name}</div>
-                  <div style={{ fontSize: 11, color: C.muted }}>{card.type_line}</div>
+            {searchResults.map(card => {
+              const legendary = format === "commander" && isLegendaryCreature(card);
+              return (
+                <div
+                  key={card.id}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 8px",
+                    borderBottom: `1px solid ${C.border}22`,
+                  }}
+                >
+                  {getImg(card) && <img src={getImg(card)} alt="" style={{ width: 32, borderRadius: 3, flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.name}</div>
+                    <div style={{ fontSize: 10, color: C.muted }}>{card.type_line}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    {legendary && (
+                      <button
+                        onClick={() => {
+                          onSetCommander(card);
+                          onAdd(card);
+                          flash(`👑 Commander set: ${card.name}`);
+                          setSearchQuery(""); setSearchResults([]);
+                        }}
+                        style={{
+                          ...touchBase,
+                          fontSize: 10, fontWeight: 700, color: "#a855f7",
+                          background: "rgba(168,85,247,0.12)",
+                          border: "1px solid rgba(168,85,247,0.3)",
+                          borderRadius: 6, padding: "5px 8px", minHeight: 32,
+                        }}
+                      >
+                        👑
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        onAdd(card);
+                        flash(`✓ Added: ${card.name}`);
+                        setSearchQuery(""); setSearchResults([]);
+                      }}
+                      style={{
+                        ...touchBase,
+                        fontSize: 10, fontWeight: 700, color: C.gold,
+                        background: `${C.gold}15`,
+                        border: `1px solid ${C.gold}33`,
+                        borderRadius: 6, padding: "5px 10px", minHeight: 32,
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
                 </div>
-                <Tag color={C.gold} style={{ marginLeft: "auto" }}>+ Add</Tag>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Panel>
@@ -513,13 +705,32 @@ const ScanTab = ({ onAdd }) => {
 
 // ─── Deck Tab ────────────────────────────────────────────────────────────────
 
-const DeckTab = ({ deck, deckName, setDeckName, onDelta, onClear, onPreview }) => {
+const DeckTab = ({
+  deck, deckName, setDeckName,
+  onDelta, onClear, onPreview,
+  format, commander, onSetCommander, onClearCommander,
+}) => {
   const [confirmClear, setConfirmClear] = useState(false);
+  const target = format === "commander" ? 100 : 60;
+  const total  = deck.reduce((s, d) => s + d.count, 0);
+  const progress = Math.min(100, (total / target) * 100);
+  const remaining = target - total;
 
-  const total = deck.reduce((s, d) => s + d.count, 0);
-  const progress = Math.min(100, (total / 60) * 100);
+  // Singleton violation detection for commander mode
+  const singletonViolations = useMemo(() => {
+    if (format !== "commander") return new Set();
+    return new Set(
+      deck
+        .filter(({ card, count }) => count > 1 && !isBasicLand(card))
+        .map(({ card }) => card.id)
+    );
+  }, [deck, format]);
 
   const sorted = [...deck].sort((a, b) => {
+    const isCmd_a = commander?.id === a.card.id;
+    const isCmd_b = commander?.id === b.card.id;
+    if (isCmd_a) return -1;
+    if (isCmd_b) return 1;
     const ta = getCardType(a.card.type_line);
     const tb = getCardType(b.card.type_line);
     if (ta === "Land" && tb !== "Land") return 1;
@@ -539,33 +750,63 @@ const DeckTab = ({ deck, deckName, setDeckName, onDelta, onClear, onPreview }) =
             width: "100%", background: "transparent",
             border: "none", outline: "none",
             fontSize: 20, fontWeight: 700, color: C.gold,
-            marginBottom: 12,
+            marginBottom: 12, minHeight: 36,
           }}
         />
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-          <span style={{ fontSize: 12, color: C.sub }}>{total} / 60 cards</span>
-          <span style={{ fontSize: 12, color: total === 60 ? C.green : C.muted }}>
-            {total === 60 ? "✓ Full deck" : `${60 - total} more to go`}
+          <span style={{ fontSize: 12, color: C.sub }}>{total} / {target} cards</span>
+          <span style={{ fontSize: 12, color: total >= target ? C.green : C.muted }}>
+            {total >= target ? "✓ Full deck!" : `${remaining} to go`}
           </span>
         </div>
-        <div style={{ height: 6, background: C.card2, borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ height: 7, background: C.card2, borderRadius: 4, overflow: "hidden" }}>
           <div style={{
-            height: "100%",
-            width: `${progress}%`,
-            background: total >= 60
+            height: "100%", width: `${progress}%`,
+            background: total >= target
               ? `linear-gradient(90deg, ${C.green}, #34d399)`
-              : `linear-gradient(90deg, ${C.gold}, #d97706)`,
-            borderRadius: 3, transition: "width 0.4s ease",
+              : format === "commander"
+                ? `linear-gradient(90deg, #a855f7, #7c3aed)`
+                : `linear-gradient(90deg, ${C.gold}, #d97706)`,
+            borderRadius: 4, transition: "width 0.4s ease",
           }} />
         </div>
+
+        {/* Singleton violations warning */}
+        {singletonViolations.size > 0 && (
+          <div style={{
+            marginTop: 10,
+            background: `${C.red}15`, border: `1px solid ${C.red}33`,
+            borderRadius: 8, padding: "8px 12px",
+            fontSize: 12, color: C.red,
+          }}>
+            ⚠️ {singletonViolations.size} card{singletonViolations.size > 1 ? "s" : ""} break the singleton rule
+          </div>
+        )}
       </Panel>
+
+      {/* Commander hero */}
+      {format === "commander" && (
+        <CommanderHero
+          commander={commander}
+          onClear={onClearCommander}
+          onPreview={onPreview}
+        />
+      )}
+
+      {/* No commander nudge */}
+      {format === "commander" && !commander && deck.length > 0 && (
+        <div style={{
+          background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)",
+          borderRadius: 10, padding: "10px 14px", marginBottom: 12,
+          fontSize: 13, color: "#d8b4fe",
+        }}>
+          👑 Tap <strong>Make Commander</strong> on any Legendary Creature below to set your commander
+        </div>
+      )}
 
       {/* Card list */}
       {deck.length === 0 ? (
-        <div style={{
-          textAlign: "center", padding: "48px 0",
-          color: C.muted, fontSize: 14,
-        }}>
+        <div style={{ textAlign: "center", padding: "48px 0", color: C.muted, fontSize: 14 }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🃏</div>
           No cards yet — scan some from the Scan tab!
         </div>
@@ -577,23 +818,27 @@ const DeckTab = ({ deck, deckName, setDeckName, onDelta, onClear, onPreview }) =
               entry={entry}
               onDelta={onDelta}
               onPreview={onPreview}
+              format={format}
+              commander={commander}
+              onSetCommander={onSetCommander}
+              singletonViolation={singletonViolations.has(entry.card.id)}
             />
           ))}
         </Panel>
       )}
 
-      {/* Clear */}
+      {/* Clear deck */}
       {deck.length > 0 && (
         <div style={{ textAlign: "center", paddingBottom: 8 }}>
           {confirmClear ? (
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
               <GoldBtn
                 onClick={() => { onClear(); setConfirmClear(false); }}
-                style={{ background: `linear-gradient(135deg, ${C.red}, #b91c1c)`, fontSize: 13, padding: "8px 16px" }}
+                style={{ background: `linear-gradient(135deg, ${C.red}, #b91c1c)`, fontSize: 13, padding: "10px 16px" }}
               >
                 ⚠️ Yes, clear deck
               </GoldBtn>
-              <GoldBtn variant="secondary" onClick={() => setConfirmClear(false)} style={{ fontSize: 13, padding: "8px 16px" }}>
+              <GoldBtn variant="secondary" onClick={() => setConfirmClear(false)} style={{ fontSize: 13, padding: "10px 16px" }}>
                 Cancel
               </GoldBtn>
             </div>
@@ -610,7 +855,7 @@ const DeckTab = ({ deck, deckName, setDeckName, onDelta, onClear, onPreview }) =
 
 // ─── Stats Tab ────────────────────────────────────────────────────────────────
 
-const StatsTab = ({ analytics, deck }) => {
+const StatsTab = ({ analytics, deck, format }) => {
   if (!analytics || !deck.length) {
     return (
       <div style={{ textAlign: "center", padding: "48px 16px", color: C.muted }}>
@@ -622,25 +867,26 @@ const StatsTab = ({ analytics, deck }) => {
 
   const { total, lands, spells, avgCmc, curveData, colorData, typeData } = analytics;
   const landPct = total ? ((lands / total) * 100).toFixed(0) : 0;
-  const landWarning = total > 0 && (landPct < 37 || landPct > 40);
+  // Commander: 35-40 lands, Standard: 37-40%
+  const [minLand, maxLand] = format === "commander" ? [33, 40] : [37, 40];
+  const landWarning = total > 0 && (landPct < minLand || landPct > maxLand);
 
   return (
     <div style={{ padding: "16px 16px 0" }}>
-      {/* Stat grid */}
       <Panel>
         <SectionTitle>Overview</SectionTitle>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {[
-            { label: "Total Cards",  value: total,   color: C.gold  },
-            { label: "Spells",       value: spells,  color: "#3b82f6" },
-            { label: "Lands",        value: lands,   color: "#92400e" },
-            { label: "Avg CMC",      value: avgCmc,  color: "#a3e635" },
+            { label: "Total Cards", value: total,   color: C.gold    },
+            { label: "Spells",      value: spells,  color: "#3b82f6" },
+            { label: "Lands",       value: lands,   color: "#92400e" },
+            { label: "Avg CMC",     value: avgCmc,  color: "#a3e635" },
           ].map(s => (
             <div key={s.label} style={{
               background: C.card2, borderRadius: 10, padding: "12px 14px",
               border: `1px solid ${C.border}`,
             }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
               <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{s.label}</div>
             </div>
           ))}
@@ -653,12 +899,11 @@ const StatsTab = ({ analytics, deck }) => {
             borderRadius: 8, padding: "8px 12px",
             fontSize: 12, color: "#f59e0b",
           }}>
-            ⚠️ Land count {landPct}% is outside the recommended 37–40% range
+            ⚠️ Lands at {landPct}% — recommended {minLand}–{maxLand}% for {format === "commander" ? "Commander" : "60-card"}
           </div>
         )}
       </Panel>
 
-      {/* Colour distribution */}
       {colorData.length > 0 && (
         <Panel>
           <SectionTitle>Colour Distribution</SectionTitle>
@@ -668,9 +913,9 @@ const StatsTab = ({ analytics, deck }) => {
                 display: "flex", alignItems: "center", gap: 6,
                 background: `${MANA[c]?.bg ?? "#333"}22`,
                 border: `1px solid ${MANA[c]?.bg ?? "#333"}44`,
-                borderRadius: 20, padding: "5px 10px",
+                borderRadius: 20, padding: "6px 12px",
               }}>
-                <span style={{ fontSize: 14 }}>{MANA[c]?.emoji}</span>
+                <span style={{ fontSize: 16 }}>{MANA[c]?.emoji}</span>
                 <span style={{ fontWeight: 700, color: C.text }}>{n}</span>
                 <span style={{ fontSize: 11, color: C.sub }}>{MANA[c]?.label}</span>
               </div>
@@ -679,26 +924,14 @@ const StatsTab = ({ analytics, deck }) => {
         </Panel>
       )}
 
-      {/* Mana curve */}
       <Panel>
         <SectionTitle>Mana Curve (Non-Lands)</SectionTitle>
-        <ResponsiveContainer width="100%" height={160}>
+        <ResponsiveContainer width="100%" height={165}>
           <BarChart data={curveData} margin={{ top: 4, right: 0, bottom: 0, left: -25 }}>
-            <XAxis
-              dataKey="cmc"
-              tick={{ fill: C.sub, fontSize: 12 }}
-              axisLine={false} tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: C.sub, fontSize: 11 }}
-              axisLine={false} tickLine={false}
-              allowDecimals={false}
-            />
+            <XAxis dataKey="cmc" tick={{ fill: C.sub, fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: C.sub, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip
-              contentStyle={{
-                background: "#0d1832", border: `1px solid ${C.border}`,
-                borderRadius: 8, color: C.text, fontSize: 12,
-              }}
+              contentStyle={{ background: "#0d1832", border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 12 }}
               cursor={{ fill: "rgba(255,255,255,0.04)" }}
               formatter={(v) => [v, "Cards"]}
               labelFormatter={(l) => `CMC ${l}`}
@@ -712,11 +945,10 @@ const StatsTab = ({ analytics, deck }) => {
         </ResponsiveContainer>
       </Panel>
 
-      {/* Type breakdown */}
       <Panel>
         <SectionTitle>Card Types</SectionTitle>
         {typeData.map(([type, count]) => (
-          <div key={type} style={{ marginBottom: 8 }}>
+          <div key={type} style={{ marginBottom: 9 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
               <span style={{ fontSize: 12, color: C.sub }}>{type}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{count}</span>
@@ -739,51 +971,35 @@ const StatsTab = ({ analytics, deck }) => {
 // ─── AI Insights Tab ─────────────────────────────────────────────────────────
 
 const renderMarkdown = (text) => {
-  const lines = text.split("\n");
-  return lines.map((line, i) => {
-    // Bold headers **text**
+  return text.split("\n").map((line, i) => {
     if (/^\*\*.*\*\*$/.test(line.trim())) {
       return (
         <div key={i} style={{
           fontWeight: 700, fontSize: 15, color: C.gold,
-          marginTop: 14, marginBottom: 6,
-          borderBottom: `1px solid ${C.border}`,
-          paddingBottom: 4,
+          marginTop: 16, marginBottom: 6,
+          borderBottom: `1px solid ${C.border}`, paddingBottom: 5,
         }}>
           {line.replace(/\*\*/g, "")}
         </div>
       );
     }
-    // Bullet points
     if (line.trim().startsWith("- ") || line.trim().startsWith("• ")) {
       return (
-        <div key={i} style={{
-          display: "flex", gap: 8, marginBottom: 4,
-          fontSize: 13, color: C.text, lineHeight: 1.6,
-        }}>
+        <div key={i} style={{ display: "flex", gap: 8, marginBottom: 5, fontSize: 13, color: C.text, lineHeight: 1.65 }}>
           <span style={{ color: C.gold, flexShrink: 0 }}>•</span>
-          <span dangerouslySetInnerHTML={{
-            __html: line.replace(/^[-•]\s*/, "").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-          }} />
+          <span dangerouslySetInnerHTML={{ __html: line.replace(/^[-•]\s*/, "").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>") }} />
         </div>
       );
     }
-    // Inline bold
     if (/\*\*/.test(line)) {
       return (
-        <div key={i} style={{ fontSize: 13, color: C.text, marginBottom: 4, lineHeight: 1.6 }}
-          dangerouslySetInnerHTML={{
-            __html: line.replace(/\*\*(.+?)\*\*/g, "<strong style='color:#e2e8f0'>$1</strong>")
-          }}
+        <div key={i} style={{ fontSize: 13, color: C.text, marginBottom: 5, lineHeight: 1.65 }}
+          dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, "<strong style='color:#e2e8f0'>$1</strong>") }}
         />
       );
     }
-    if (!line.trim()) return <div key={i} style={{ height: 6 }} />;
-    return (
-      <div key={i} style={{ fontSize: 13, color: C.text, marginBottom: 4, lineHeight: 1.6 }}>
-        {line}
-      </div>
-    );
+    if (!line.trim()) return <div key={i} style={{ height: 7 }} />;
+    return <div key={i} style={{ fontSize: 13, color: C.text, marginBottom: 5, lineHeight: 1.65 }}>{line}</div>;
   });
 };
 
@@ -793,16 +1009,15 @@ const BracketBadge = ({ bracket }) => {
   if (!b) return null;
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 10,
+      display: "flex", alignItems: "center", gap: 12,
       background: `${b.color}22`, border: `1px solid ${b.color}44`,
-      borderRadius: 12, padding: "12px 16px", marginBottom: 12,
-      animation: "fadeIn 0.3s ease",
+      borderRadius: 12, padding: "12px 16px", marginBottom: 14,
     }}>
       <div style={{
         fontSize: 22, fontWeight: 900, color: b.color,
-        background: `${b.color}22`, width: 44, height: 44,
-        borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-        border: `2px solid ${b.color}`,
+        background: `${b.color}22`, width: 46, height: 46, borderRadius: "50%",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        border: `2px solid ${b.color}`, flexShrink: 0,
       }}>
         {bracket}
       </div>
@@ -814,19 +1029,18 @@ const BracketBadge = ({ bracket }) => {
   );
 };
 
-const InsightsTab = ({ deck, deckName, analytics }) => {
-  const [status, setStatus] = useState("idle"); // idle | loading | done | error
+const InsightsTab = ({ deck, deckName, analytics, format, commander }) => {
+  const [status,   setStatus]   = useState("idle");
   const [insights, setInsights] = useState("");
-  const [bracket, setBracket] = useState(null);
-  const [error, setError] = useState("");
+  const [bracket,  setBracket]  = useState(null);
+  const [error,    setError]    = useState("");
 
   const canGenerate = deck.length > 0 && !!API_KEY;
+  const isCommander = format === "commander";
 
   const generate = async () => {
     setStatus("loading");
-    setInsights("");
-    setBracket(null);
-    setError("");
+    setInsights(""); setBracket(null); setError("");
 
     try {
       const { total, lands, avgCmc } = analytics ?? {};
@@ -834,62 +1048,67 @@ const InsightsTab = ({ deck, deckName, analytics }) => {
         .map(d => `${d.count}x ${d.card.name} [${d.card.type_line}] CMC:${d.card.cmc ?? 0}`)
         .join("\n");
 
-      const prompt = `You are an expert Magic: The Gathering deckbuilder and strategist with deep knowledge of all formats.
+      const commanderLine = commander
+        ? `Commander: ${commander.name} [${commander.type_line}]`
+        : "";
 
+      const prompt = `You are an expert Magic: The Gathering deckbuilder and strategist.
+
+Format: ${isCommander ? "Commander / EDH (100-card singleton)" : "60-card constructed"}
 Deck: "${deckName || "Unnamed Deck"}"
+${commanderLine}
 Stats: Total:${total ?? 0}, Lands:${lands ?? 0}, AvgCMC:${avgCmc ?? 0}
 
 Decklist:
 ${deckList}
 
-Analyse this deck and provide a thorough review. Structure your response EXACTLY as follows:
+Analyse this deck thoroughly. Structure your response EXACTLY as follows:
 
 **🎯 Archetype & Strategy**
-Describe the deck's primary strategy and archetype in 2-3 sentences.
+Describe the deck's primary strategy in 2-3 sentences.${isCommander ? " Reference the commander's role." : ""}
 
 **🏆 Bracket Estimate**
-State the Commander bracket (1–5) with a brief justification. Format as: "Bracket X — Label"
-1=Exhibition (precon-level), 2=Core (casual), 3=Upgraded (focused synergies), 4=Optimised (near-cEDH), 5=cEDH (fully competitive)
+${isCommander
+  ? `State the Commander bracket (1–5). Format: "Bracket X — Label"
+1=Exhibition (precon), 2=Core (casual), 3=Upgraded (synergy-focused), 4=Optimised (near-cEDH), 5=cEDH`
+  : `Rate the deck's power level (1–5). Format: "Bracket X — Label"
+1=Budget kitchen table, 2=Casual FNM, 3=Local competitive, 4=PTQS/Regional, 5=Pro Tour level`}
 
 **💪 Key Strengths**
-- List 3-4 specific strengths, naming actual cards
+- List 3-4 specific strengths, naming actual cards and synergies
 
 **⚠️ Weaknesses & Risks**
-- List 3-4 specific weaknesses or vulnerabilities
+- List 3-4 specific weaknesses or vulnerabilities the deck faces
 
 **💡 Recommended Changes**
-- Name specific cards to ADD and WHY
-- Name specific cards to CUT and WHY
-- Give at least 4 concrete suggestions
+- Name specific cards to ADD and exactly why they improve the deck
+- Name specific cards to CUT and why they underperform
+- Give at least 4 concrete swap suggestions
 
 **🏔️ Mana Base Assessment**
-Evaluate the land count, colour fixing, and mana base quality. Be specific.
+Evaluate land count, colour fixing, and ramp. For Commander, comment on whether 35-40 lands is appropriate.
 
 **⭐ Overall Rating**
-Give a score X/10 and a one-paragraph summary of the deck's overall quality and potential.
+Score X/10 with a one-paragraph summary of quality and potential.
 
-Be specific, reference real card interactions and synergies, keep advice practical and actionable.`;
+Be specific and practical. Reference real card interactions.`;
 
       const res = await fetch(ANTHROPIC_API, {
         method: "POST",
         headers: apiHeaders(),
         body: JSON.stringify({
           model: "claude-opus-4-5",
-          max_tokens: 1500,
+          max_tokens: 1600,
           messages: [{ role: "user", content: prompt }]
         })
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || "API error");
-
       const text = data.content?.[0]?.text ?? "";
       setInsights(text);
-
-      // Extract bracket number from the response
-      const bracketMatch = text.match(/Bracket\s+([1-5])/i);
-      if (bracketMatch) setBracket(parseInt(bracketMatch[1]));
-
+      const m = text.match(/Bracket\s+([1-5])/i);
+      if (m) setBracket(parseInt(m[1]));
       setStatus("done");
     } catch (e) {
       setError(e.message);
@@ -901,43 +1120,34 @@ Be specific, reference real card interactions and synergies, keep advice practic
     <div style={{ padding: "16px 16px 0" }}>
       <Panel>
         <SectionTitle>AI Deck Analysis</SectionTitle>
-        <div style={{ fontSize: 13, color: C.sub, marginBottom: 14, lineHeight: 1.6 }}>
-          Get a full archetype breakdown, bracket estimate, and specific card recommendations powered by Claude AI.
+        <div style={{ fontSize: 13, color: C.sub, marginBottom: 14, lineHeight: 1.65 }}>
+          {isCommander
+            ? "Get an archetype breakdown, Commander bracket rating, and card-specific advice for your EDH build."
+            : "Get an archetype breakdown, power level, and specific card recommendations."}
         </div>
 
         {!API_KEY && (
-          <div style={{
-            background: "#ef444422", border: "1px solid #ef444444",
-            borderRadius: 8, padding: "10px 12px",
-            fontSize: 12, color: C.red, marginBottom: 12,
-          }}>
-            ⚠️ Add <strong>VITE_ANTHROPIC_API_KEY</strong> to your .env file to enable AI insights
+          <div style={{ background: `${C.red}15`, border: `1px solid ${C.red}33`, borderRadius: 8, padding: "10px 12px", fontSize: 12, color: C.red, marginBottom: 12 }}>
+            ⚠️ Add <strong>VITE_ANTHROPIC_API_KEY</strong> to your .env to enable AI insights
           </div>
         )}
-
         {deck.length === 0 && (
-          <div style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>
-            Add cards to your deck first
-          </div>
+          <div style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>Add cards to your deck first</div>
         )}
 
         <GoldBtn
           onClick={generate}
           disabled={!canGenerate || status === "loading"}
-          style={{ width: "100%", justifyContent: "center", display: "flex", gap: 8 }}
+          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
         >
-          {status === "loading" ? (
-            <><Spinner size={16} /> Analysing deck…</>
-          ) : status === "done" ? (
-            "🔄 Regenerate Insights"
-          ) : (
-            "✨ Generate Insights"
-          )}
+          {status === "loading" ? <><Spinner size={16} /> Analysing…</> :
+           status === "done"    ? "🔄 Regenerate Insights" :
+                                  "✨ Generate Insights"}
         </GoldBtn>
       </Panel>
 
       {status === "error" && (
-        <Panel style={{ borderColor: "#ef444444" }}>
+        <Panel style={{ borderColor: `${C.red}44` }}>
           <div style={{ color: C.red, fontSize: 13 }}>❌ {error}</div>
         </Panel>
       )}
@@ -945,7 +1155,7 @@ Be specific, reference real card interactions and synergies, keep advice practic
       {status === "done" && insights && (
         <Panel style={{ animation: "fadeIn 0.3s ease" }}>
           <BracketBadge bracket={bracket} />
-          <div>{renderMarkdown(insights)}</div>
+          {renderMarkdown(insights)}
         </Panel>
       )}
     </div>
@@ -957,33 +1167,33 @@ Be specific, reference real card interactions and synergies, keep advice practic
 const CardModal = ({ card, onClose }) => {
   if (!card) return null;
   const fullImg = getImg(card, "normal");
-
   return (
     <div
       onClick={onClose}
       style={{
         position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.85)",
+        background: "rgba(0,0,0,0.88)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 20,
-        animation: "fadeIn 0.15s ease",
+        padding: 24, animation: "fadeIn 0.15s ease",
       }}
     >
       <div onClick={e => e.stopPropagation()} style={{ maxWidth: 340, width: "100%" }}>
         {fullImg && (
-          <img
-            src={fullImg}
-            alt={card.name}
+          <img src={fullImg} alt={card.name}
             style={{ width: "100%", borderRadius: 18, boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}
           />
         )}
-        <div style={{ textAlign: "center", marginTop: 12 }}>
-          <div style={{ color: C.text, fontWeight: 700 }}>{card.name}</div>
+        <div style={{ textAlign: "center", marginTop: 14 }}>
+          <div style={{ color: C.text, fontWeight: 700, fontSize: 15 }}>{card.name}</div>
           <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{card.set_name}</div>
           <button
             onClick={onClose}
-            style={{ marginTop: 14, color: C.sub, fontSize: 13, padding: "8px 20px",
-              border: `1px solid ${C.border}`, borderRadius: 8, background: C.card2 }}
+            style={{
+              ...touchBase,
+              marginTop: 16, color: C.sub, fontSize: 14,
+              padding: "10px 28px", minHeight: 44,
+              border: `1px solid ${C.border}`, borderRadius: 10, background: C.card2,
+            }}
           >
             Close
           </button>
@@ -996,16 +1206,18 @@ const CardModal = ({ card, onClose }) => {
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: "scan",    label: "Scan",  emoji: "📷" },
-  { id: "deck",    label: "Deck",  emoji: "🃏" },
-  { id: "stats",   label: "Stats", emoji: "📊" },
-  { id: "ai",      label: "AI",    emoji: "✨" },
+  { id: "scan",  label: "Scan",  emoji: "📷" },
+  { id: "deck",  label: "Deck",  emoji: "🃏" },
+  { id: "stats", label: "Stats", emoji: "📊" },
+  { id: "ai",    label: "AI",    emoji: "✨" },
 ];
 
 export default function DeckScanner() {
-  const [tab, setTab]           = useState("scan");
-  const [deck, setDeck]         = useState([]);
-  const [deckName, setDeckName] = useState("My Deck");
+  const [tab,         setTab]         = useState("scan");
+  const [deck,        setDeck]        = useState([]);
+  const [deckName,    setDeckName]    = useState("My Deck");
+  const [format,      setFormat]      = useState("standard"); // "standard" | "commander"
+  const [commander,   setCommander]   = useState(null);
   const [previewCard, setPreviewCard] = useState(null);
 
   const addCard = useCallback((card) => {
@@ -1024,14 +1236,30 @@ export default function DeckScanner() {
     );
   }, []);
 
-  const clearDeck = useCallback(() => setDeck([]), []);
+  const clearDeck = useCallback(() => {
+    setDeck([]);
+    setCommander(null);
+  }, []);
+
+  const handleSetCommander = useCallback((card) => {
+    setCommander(card);
+  }, []);
+
+  const handleClearCommander = useCallback(() => {
+    setCommander(null);
+  }, []);
+
+  const handleFormatChange = useCallback((newFormat) => {
+    setFormat(newFormat);
+    if (newFormat === "standard") setCommander(null);
+  }, []);
 
   const analytics = useMemo(() => {
     if (!deck.length) return null;
     const total = deck.reduce((s, d) => s + d.count, 0);
     const curve = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, "7+":0 };
     const colorCounts = { W:0, U:0, B:0, R:0, G:0 };
-    const typeCounts = {};
+    const typeCounts  = {};
     let lands = 0, totalCmc = 0, spells = 0;
 
     deck.forEach(({ card, count }) => {
@@ -1049,13 +1277,14 @@ export default function DeckScanner() {
     return {
       total, lands, spells,
       avgCmc: spells ? (totalCmc / spells).toFixed(1) : "0.0",
-      curveData: Object.entries(curve).map(([cmc, count]) => ({ cmc, count })),
-      colorData: Object.entries(colorCounts).filter(([, n]) => n > 0).sort((a,b) => b[1]-a[1]),
-      typeData: Object.entries(typeCounts).sort((a, b) => b[1] - a[1]),
+      curveData:  Object.entries(curve).map(([cmc, count]) => ({ cmc, count })),
+      colorData:  Object.entries(colorCounts).filter(([, n]) => n > 0).sort((a,b) => b[1]-a[1]),
+      typeData:   Object.entries(typeCounts).sort((a, b) => b[1] - a[1]),
     };
   }, [deck]);
 
   const totalCards = deck.reduce((s, d) => s + d.count, 0);
+  const target = format === "commander" ? 100 : 60;
 
   return (
     <div style={{
@@ -1063,40 +1292,38 @@ export default function DeckScanner() {
       minHeight: "100dvh",
       background: C.bg,
       display: "flex", flexDirection: "column",
-      position: "relative",
     }}>
       {/* Header */}
       <div style={{
-        position: "sticky", top: 0, zIndex: 100,
+        position: "sticky", top: 0, zIndex: 200,
         background: `${C.card}f0`,
         backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         borderBottom: `1px solid ${C.border}`,
-        padding: "12px 16px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 14px",
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
       }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: C.gold, letterSpacing: -0.5 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: C.gold, letterSpacing: -0.3, lineHeight: 1.2 }}>
             ⚔️ MTG Companion
           </div>
-          <div style={{ fontSize: 11, color: C.muted }}>
-            {deckName} · {totalCards} cards
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>
+            {deckName} · {totalCards}/{target}
           </div>
         </div>
-        {totalCards > 0 && (
-          <div style={{
-            background: `${C.gold}22`, border: `1px solid ${C.gold}44`,
-            borderRadius: 20, padding: "4px 10px",
-            fontSize: 12, fontWeight: 700, color: C.gold,
-          }}>
-            {totalCards} cards
-          </div>
-        )}
+        <FormatToggle format={format} onChange={handleFormatChange} />
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 80 }}>
-        {tab === "scan"  && <ScanTab onAdd={addCard} />}
-        {tab === "deck"  && (
+      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 72 }}>
+        {tab === "scan" && (
+          <ScanTab
+            onAdd={addCard}
+            onSetCommander={handleSetCommander}
+            format={format}
+          />
+        )}
+        {tab === "deck" && (
           <DeckTab
             deck={deck}
             deckName={deckName}
@@ -1104,14 +1331,22 @@ export default function DeckScanner() {
             onDelta={updateCount}
             onClear={clearDeck}
             onPreview={setPreviewCard}
+            format={format}
+            commander={commander}
+            onSetCommander={handleSetCommander}
+            onClearCommander={handleClearCommander}
           />
         )}
-        {tab === "stats" && <StatsTab analytics={analytics} deck={deck} />}
-        {tab === "ai"    && (
+        {tab === "stats" && (
+          <StatsTab analytics={analytics} deck={deck} format={format} />
+        )}
+        {tab === "ai" && (
           <InsightsTab
             deck={deck}
             deckName={deckName}
             analytics={analytics}
+            format={format}
+            commander={commander}
           />
         )}
       </div>
@@ -1120,12 +1355,13 @@ export default function DeckScanner() {
       <div style={{
         position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
         width: "100%", maxWidth: 480,
-        background: `${C.card}f8`,
+        background: `${C.card}fa`,
         backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
         borderTop: `1px solid ${C.border}`,
         display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
         zIndex: 100,
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        paddingBottom: "max(env(safe-area-inset-bottom, 0px), 4px)",
       }}>
         {TABS.map(t => {
           const active = tab === t.id;
@@ -1134,22 +1370,23 @@ export default function DeckScanner() {
               key={t.id}
               onClick={() => setTab(t.id)}
               style={{
+                ...touchBase,
                 padding: "10px 4px 8px",
                 display: "flex", flexDirection: "column",
                 alignItems: "center", gap: 3,
                 color: active ? C.gold : C.muted,
-                transition: "color 0.15s",
-                background: "none",
+                background: "none", border: "none",
                 position: "relative",
+                minHeight: 56,
               }}
             >
               {active && (
                 <div style={{
-                  position: "absolute", top: 0, left: "20%", right: "20%",
-                  height: 2, background: C.gold, borderRadius: "0 0 2px 2px",
+                  position: "absolute", top: 0, left: "22%", right: "22%",
+                  height: 2, background: C.gold, borderRadius: "0 0 3px 3px",
                 }} />
               )}
-              <span style={{ fontSize: 20 }}>{t.emoji}</span>
+              <span style={{ fontSize: 22 }}>{t.emoji}</span>
               <span style={{ fontSize: 10, fontWeight: active ? 700 : 400, letterSpacing: 0.3 }}>
                 {t.label}
               </span>
@@ -1158,7 +1395,6 @@ export default function DeckScanner() {
         })}
       </div>
 
-      {/* Card preview modal */}
       {previewCard && <CardModal card={previewCard} onClose={() => setPreviewCard(null)} />}
     </div>
   );
