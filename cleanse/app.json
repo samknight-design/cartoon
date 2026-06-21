@@ -37,12 +37,7 @@
       "expo-router",
       "expo-media-library",
       "expo-secure-store",
-      [
-        "expo-sqlite",
-        {
-          "enableFTS": true
-        }
-      ]
+      "expo-sqlite"
     ],
     "runtimeVersion": {
       "policy": "sdkVersion"
